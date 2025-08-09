@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 
 
 class Node:
@@ -182,39 +181,3 @@ class ElSum(Node):
 
 def sigmoid(x):
     return Inv(C(1) + Exp(C(-1) * x))
-
-
-aa = np.array(
-    [[6, -4, 0, 2, -8], [-8, 8, -4, 3, 5], [-2, 1, 4, -5, 7], [1, 0, -7, 4, 5]]
-)
-aa2 = np.array([[2, -2, 0, 2], [7, 0, -3, -5], [-7, 9, 2, -2], [-1, -9, 2, 3]])
-
-bb = np.array([1, 2, -3, -4, 5])
-
-A = V(aa)
-A2 = V(aa2)
-b = V(bb)
-c = ReLU(A @ b)
-c2 = sigmoid(A2 @ c)
-
-c2.eval()
-
-print(c2.value)
-
-c2.back()
-
-print(A.grad)
-print(b.grad)
-
-
-AA = torch.tensor(aa, dtype=float, requires_grad=True)
-AA2 = torch.tensor(aa2, dtype=float, requires_grad=True)
-BB = torch.tensor(bb, dtype=float, requires_grad=True)
-CC = torch.nn.ReLU()(AA @ BB)
-CC2 = torch.nn.Sigmoid()(AA2 @ CC)
-
-CC2.sum().backward()
-
-print(CC2)
-print(AA.grad)
-print(BB.grad)
