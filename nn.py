@@ -1,11 +1,11 @@
-from autograd import V, sigmoid, ReLU, C
+from autograd import V, sigmoid, ReLU
 import numpy as np
 import copy
 
 
 class Layer:
     def __init__(self, in_size, out_size, activation):
-        self.W = V(np.random.normal(0, 0.3, [out_size, in_size]))
+        self.W = V(np.random.normal(0.5, 0.5, [out_size, in_size]))
         self.b = V(np.zeros(out_size))
         self.activation = activation
 
@@ -20,7 +20,7 @@ class NN:
             if i == len(layer_sizes) - 2:
                 activation = sigmoid
             else:
-                activation = sigmoid
+                activation = ReLU
             self.layers.append(Layer(layer_sizes[i], layer_sizes[i + 1], activation))
 
     def forward(self, input):

@@ -5,10 +5,11 @@ class Node:
     def __init__(self):
         self.value = None
         self.grad = 0
+        self.children = []
 
     def back(self, error=None):
         self.grad = np.ones_like(self.value)
-        self._clipped_back(error)
+        self._back(error)
 
     def __add__(self, other):
         return Sum(self, other)
@@ -28,16 +29,23 @@ class Node:
     def __str__(self):
         return f"Value({self.value})"
 
-    def _clipped_back(self, error):
-        self.grad = np.clip(self.grad, -1, 1)
-        self._back(error)
-
     def _back(self, error):
+        # self.grad = np.clip(self.grad, -100, 100)
+        self._apply_grad(error)
+        for child in self.children:
+            child._back(error)
+
+    def _apply_grad(self, error):
         _ = error
         raise NotImplementedError()
 
     def eval(self):
         raise NotImplementedError()
+
+    def reset_grad(self):
+        self.grad = 0
+        for child in self.children:
+            child.reset_grad()
 
 
 class V(Node):
@@ -48,8 +56,9 @@ class V(Node):
     def eval(self):
         return self.value
 
-    def _back(self, error):
-        self.value -= self.grad * error
+    def _apply_grad(self, error):
+        if error is not None:
+            self.value -= self.grad * error
 
 
 class C(V):
@@ -60,132 +69,123 @@ class C(V):
 
 class Sum(Node):
     def __init__(self, a: Node, b: Node):
-        self.a = a
-        self.b = b
         super().__init__()
+        self.children = [a, b]
 
     def __str__(self):
-        return f"Sum({self.a}, {self.b})"
+        return f"Sum({self.children[0]}, {self.children[1]})"
 
     def eval(self):
-        self.value = self.a.eval() + self.b.eval()
+        self.value = self.children[0].eval() + self.children[1].eval()
         return self.value
 
-    def _back(self, error):
-        self.a.grad += self.grad
-        self.b.grad += self.grad
-        self.a._clipped_back(error)
-        self.b._clipped_back(error)
+    def _apply_grad(self, error):
+        self.children[0].grad += self.grad
+        self.children[1].grad += self.grad
 
 
 class Product(Node):
     def __init__(self, a: Node, b: Node):
-        self.a = a
-        self.b = b
         super().__init__()
+        self.children = [a, b]
 
     def __str__(self):
-        return f"Product({self.a}, {self.b})"
+        return f"Product({self.children[0]}, {self.children[1]})"
 
     def eval(self):
-        self.value = self.a.eval() * self.b.eval()
+        self.value = self.children[0].eval() * self.children[1].eval()
         return self.value
 
-    def _back(self, error):
-        self.a.grad += self.grad * self.b.eval()
-        self.b.grad += self.grad * self.a.eval()
-        self.a._clipped_back(error)
-        self.b._clipped_back(error)
+    def _apply_grad(self, error):
+        self.children[0].grad += self.grad * self.children[1].eval()
+        self.children[1].grad += self.grad * self.children[0].eval()
 
 
 class MatProduct(Node):
     def __init__(self, a: Node, b: Node):
-        self.a = a  # Matrix
-        self.b = b  # Vector
         super().__init__()
+        self.children = [a, b]
 
     def __str__(self):
-        return f"MatProduct({self.a}, {self.b})"
+        return f"MatProduct({self.children[0]}, {self.children[1]})"
 
     def eval(self):
-        self.value = self.a.eval() @ self.b.eval()
+        self.value = self.children[0].eval() @ self.children[1].eval()
         return self.value
 
-    def _back(self, error):
-        self.a.grad += np.expand_dims(self.grad, axis=1) * self.b.eval()
-        self.b.grad += self.a.eval().T @ self.grad
-        self.a._clipped_back(error)
-        self.b._clipped_back(error)
+    def _apply_grad(self, error):
+        self.children[0].grad += (
+            np.expand_dims(self.grad, axis=1) * self.children[1].eval()
+        )
+        self.children[1].grad += self.children[0].eval().T @ self.grad
 
 
 class ReLU(Node):
     def __init__(self, input: Node):
-        self.input = input
         super().__init__()
+        self.children = [input]
 
     def __str__(self):
-        return f"Product({self.input})"
+        return f"Product({self.children[0]})"
 
     def eval(self):
-        self.value = np.maximum(self.input.eval(), 0)
+        self.value = np.maximum(self.children[0].eval(), 0)
         return self.value
 
-    def _back(self, error):
-        self.input.grad += (
-            self.grad * np.minimum(np.maximum(self.input.eval(), 0), 0.001) / 0.001
+    def _apply_grad(self, error):
+        self.children[0].grad += (
+            self.grad
+            * np.minimum(np.maximum(self.children[0].eval(), 0), 0.001)
+            / 0.001
         )
-        self.input._clipped_back(error)
 
 
 class Exp(Node):
     def __init__(self, input: Node):
-        self.input = input
         super().__init__()
+        self.children = [input]
 
     def __str__(self):
-        return f"Exp({self.input})"
+        return f"Exp({self.children[0]})"
 
     def eval(self):
-        self.value = np.exp(self.input.eval())
+        self.value = np.exp(self.children[0].eval())
         return self.value
 
-    def _back(self, error):
-        self.input.grad += self.grad * np.exp(self.input.eval())
-        self.input._clipped_back(error)
+    def _apply_grad(self, error):
+        self.children[0].grad += self.grad * np.exp(self.children[0].eval())
 
 
 class Inv(Node):
     def __init__(self, input: Node):
-        self.input = input
         super().__init__()
+        self.children = [input]
 
     def __str__(self):
-        return f"Inv({self.input})"
+        return f"Inv({self.children[0]})"
 
     def eval(self):
-        self.value = 1 / self.input.eval()
+        self.value = 1 / self.children[0].eval()
         return self.value
 
-    def _back(self, error):
-        self.input.grad += self.grad * -1 / np.square(self.input.eval())
-        self.input._clipped_back(error)
+    def _apply_grad(self, error):
+        self.children[0].grad += self.grad * -1 / np.square(self.children[0].eval())
 
 
 class ElSum(Node):
     def __init__(self, input: Node):
-        self.input = input
         super().__init__()
+        self.children = [input]
 
     def __str__(self):
-        return f"ElSum({self.input})"
+        return f"ElSum({self.children[0]})"
 
     def eval(self):
-        self.value = np.sum(self.input.eval())
+        self.value = np.sum(self.children[0].eval())
         return self.value
 
-    def _back(self, error):
-        self.input.grad += self.grad
-        self.input._clipped_back(error)
+    def _apply_grad(self, error):
+        self.children[0].grad += self.grad
 
 
 def sigmoid(x):

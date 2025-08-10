@@ -4,15 +4,22 @@ from nn import NN, MSE
 from autograd import C
 import numpy as np
 
-X_set, y_set = make_moons(noise=0.1, random_state=0)
+plt.style.use("bmh")
 
-x = C(np.array([1, 5, 7, 9, 7, 4, 3]))
 
+# Load dataset
+X_set, y_set = make_moons(noise=0.2, random_state=0)
+
+# Create Neural Net
 nn = NN([2, 10, 10, 1])
-LR = 0.01
-EPOCHS = 5000
+
+# Train
+LR = 0.1
+LR_FAC = 0.998
+EPOCHS = 1000
 
 mses = np.zeros(EPOCHS)
+lr = LR
 for j in range(EPOCHS):
     errors = np.zeros(len(X_set))
     order = np.random.permutation(np.arange(len(X_set)))
@@ -27,8 +34,11 @@ for j in range(EPOCHS):
         errors[i] = error
     mse = MSE(errors)
     mses[j] = mse
-    print(mse)
+    lr *= LR_FAC
+    if j % 10 == 0:
+        print(f"EPOCH: {j}\t\t MSE: {mse}\t\t LR: {lr}")
 
+## Visualize Results
 
 x_res = 80
 y_res = 50
@@ -46,13 +56,16 @@ for i, X in enumerate(grid):
 
 fig, ax = plt.subplots()
 
-ax.scatter(grid[:, 0], grid[:, 1], c=grid_values, marker="s", s=20, alpha=1)
-ax.scatter(X_set[:, 0], np.array(X_set[:, 1]), c=y_set, cmap="magma")
-ax.set_title("make_moons")
+ax.scatter(grid[:, 0], grid[:, 1], c=grid_values, marker="s", s=30, alpha=1)
+ax.scatter(X_set[:, 0], X_set[:, 1], c=y_set, cmap="magma")
+ax.set_title("classification results")
 
 plt.tight_layout()
 plt.show()
 
-plt.plot(mses)
+fig, ax = plt.subplots(1)
+ax.plot(mses)
+ax.set_xlabel("epoch")
+ax.set_ylabel("mse")
 
 plt.show()
